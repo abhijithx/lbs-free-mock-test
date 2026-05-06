@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
@@ -52,7 +50,7 @@ body {
 
 /* Layout Utilities */
 .app-container {
-  min-h-screen: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
 }

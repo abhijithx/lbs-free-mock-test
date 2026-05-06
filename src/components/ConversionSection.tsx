@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Category } from '../types';
 import { CheckCircle2, Play, ArrowRight, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -48,61 +47,57 @@ export default function ConversionSection({ weakCategory }: Props) {
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.5 }}
-      style={{
-        backgroundColor: '#ffffff',
-        borderRadius: '32px',
-        border: '1px solid #e2e8f0',
-        overflow: 'hidden',
-        position: 'relative',
-        boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'
-      }}
+      className="bg-white rounded-[32px] md:rounded-[48px] border border-slate-200 overflow-hidden relative shadow-2xl shadow-slate-200/50"
     >
-      <div style={{ padding: '60px', display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '60px', alignItems: 'center' }}>
-        <div style={{ textAlign: 'left' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 16px', backgroundColor: '#f1f5f9', borderRadius: '20px', marginBottom: '24px' }}>
-            <Sparkles style={{ width: '14px', height: '14px', color: '#f59e0b' }} />
-            <span style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '1px' }}>Recommended Pathway</span>
+      <div className="p-8 md:p-12 lg:p-20 grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-12 lg:gap-20 items-center">
+        <div className="text-center lg:text-left">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-slate-100 rounded-full mb-8 border border-slate-200 shadow-sm">
+            <Sparkles className="w-4 h-4 text-amber-500" />
+            <span className="text-[10px] md:text-xs font-black uppercase tracking-wider text-slate-600">Recommended Pathway</span>
           </div>
           
-          <h2 style={{ fontSize: '36px', fontWeight: 900, color: '#0f172a', lineHeight: 1.2, margin: '0 0 20px 0' }}>
-            Bridge the Gap in <span style={{ color: '#2563eb' }}>{weakCategory}</span>
+          <h2 className="text-3xl md:text-5xl font-black text-slate-900 leading-[1.1] tracking-tight mb-6">
+            Bridge the Gap in <br className="hidden md:block" />
+            <span className="text-blue-600">{weakCategory}</span>
           </h2>
           
-          <p style={{ fontSize: '18px', color: '#64748b', lineHeight: 1.6, margin: '0 0 32px 0', fontWeight: 500 }}>
+          <p className="text-base md:text-lg text-slate-500 leading-relaxed mb-10 font-medium max-w-xl mx-auto lg:mx-0">
             {course.description}
           </p>
           
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '40px' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
             {course.benefits.map((benefit: string, i: number) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <CheckCircle2 style={{ width: '16px', height: '16px', color: '#10b981' }} />
-                <span style={{ fontSize: '14px', fontWeight: 600, color: '#475569' }}>{benefit}</span>
+              <div key={i} className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <div className="bg-emerald-100 p-1 rounded-full">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                </div>
+                <span className="text-sm font-bold text-slate-700">{benefit}</span>
               </div>
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <button style={{ padding: '16px 32px', backgroundColor: '#2563eb', color: '#ffffff', borderRadius: '12px', border: 'none', fontWeight: 800, fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 6px rgba(37, 99, 235, 0.2)' }}>
-              Join Course <ArrowRight style={{ width: '18px', height: '18px' }} />
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button className="flex-1 lg:flex-none px-10 py-5 bg-blue-600 text-white rounded-2xl font-black text-base shadow-xl shadow-blue-600/20 hover:bg-blue-700 transition-all flex items-center justify-center gap-3">
+              Join Course <ArrowRight className="w-5 h-5" />
             </button>
-            <button style={{ padding: '16px 32px', backgroundColor: '#f8fafc', color: '#475569', borderRadius: '12px', border: '1px solid #e2e8f0', fontWeight: 800, fontSize: '15px', cursor: 'pointer' }}>
+            <button className="flex-1 lg:flex-none px-10 py-5 bg-white text-slate-600 rounded-2xl border-2 border-slate-200 font-black text-base hover:bg-slate-50 transition-all">
               Curriculum
             </button>
           </div>
         </div>
 
-        <div style={{ position: 'relative', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+        <div className="relative rounded-3xl md:rounded-[40px] overflow-hidden shadow-2xl shadow-slate-400/20 group">
           <img 
             src={course.videoPlaceholder} 
             alt="Course Preview" 
-            style={{ width: '100%', height: '400px', objectCover: 'cover' }}
+            className="w-full h-72 md:h-[450px] lg:h-[500px] object-cover transition-transform duration-700 group-hover:scale-110"
           />
-          <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '32px' }}>
-            <div style={{ width: '56px', height: '56px', backgroundColor: '#ffffff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px', boxShadow: '0 10px 15px rgba(0,0,0,0.2)' }}>
-              <Play style={{ width: '20px', height: '20px', color: '#000000', fill: '#000000', marginLeft: '3px' }} />
-            </div>
-            <p style={{ margin: 0, fontSize: '10px', fontWeight: 900, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px' }}>Preview Lecture</p>
-            <h4 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#ffffff' }}>{course.title}</h4>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-8 md:p-12">
+            <button className="w-16 h-16 md:w-20 md:h-20 bg-white rounded-full flex items-center justify-center mb-6 shadow-2xl hover:scale-110 transition-transform cursor-pointer group/play">
+              <Play className="w-6 h-6 md:w-8 md:h-8 text-black fill-black ml-1 group-hover/play:text-blue-600 group-hover/play:fill-blue-600 transition-colors" />
+            </button>
+            <p className="text-[10px] md:text-xs font-black text-white/60 uppercase tracking-[0.2em] mb-2">Preview Lecture</p>
+            <h4 className="text-xl md:text-3xl font-black text-white leading-tight">{course.title}</h4>
           </div>
         </div>
       </div>

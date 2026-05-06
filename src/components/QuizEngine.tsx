@@ -1,26 +1,67 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { questions } from '../data/questions';
 import type { UserData, TestResult, Category } from '../types';
-import { Timer, ArrowRight, ArrowLeft, Send, Flag, User, CheckCircle2, Bookmark, Info, Clock } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Send, User, CheckCircle2, Bookmark, Clock } from 'lucide-react';
 import { saveResult } from '../firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props {
   userData: UserData;
   onComplete: (result: TestResult) => void;
+  onExit: () => void;
 }
 
-const TEST_DURATION = 90 * 60;
+const TEST_DURATION = 120 * 60;
 
-export default function QuizEngine({ userData, onComplete }: Props) {
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [markedForReview, setMarkedForReview] = useState<string[]>([]);
-  const [activeCategory, setActiveCategory] = useState<Category>('CS');
-  const [timeLeft, setTimeLeft] = useState(TEST_DURATION);
+export default function QuizEngine({ userData, onComplete, onExit }: Props) {
+  // Initialize states from localStorage if available
+  const [currentIdx, setCurrentIdx] = useState(() => {
+    const saved = localStorage.getItem('lbs_quiz_current_idx');
+    return saved ? parseInt(saved) : 0;
+  });
+  
+  const [answers, setAnswers] = useState<Record<string, number>>(() => {
+    const saved = localStorage.getItem('lbs_quiz_answers');
+    return saved ? JSON.parse(saved) : {};
+  });
+  
+  const [markedForReview, setMarkedForReview] = useState<string[]>(() => {
+    const saved = localStorage.getItem('lbs_quiz_marked');
+    return saved ? JSON.parse(saved) : [];
+  });
+  
+  const [activeCategory, setActiveCategory] = useState<Category>(() => {
+    return (questions[currentIdx]?.category as Category) || 'CS';
+  });
+  
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const saved = localStorage.getItem('lbs_quiz_time');
+    return saved ? parseInt(saved) : TEST_DURATION;
+  });
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
 
   const currentQuestion = questions[currentIdx];
+
+  // Save progress on every change
+  useEffect(() => {
+    localStorage.setItem('lbs_quiz_current_idx', currentIdx.toString());
+    setActiveCategory(questions[currentIdx].category);
+  }, [currentIdx]);
+
+  useEffect(() => {
+    localStorage.setItem('lbs_quiz_answers', JSON.stringify(answers));
+  }, [answers]);
+
+  useEffect(() => {
+    localStorage.setItem('lbs_quiz_marked', JSON.stringify(markedForReview));
+  }, [markedForReview]);
+
+  useEffect(() => {
+    localStorage.setItem('lbs_quiz_time', timeLeft.toString());
+  }, [timeLeft]);
 
   const handleCategoryChange = (cat: Category) => {
     setActiveCategory(cat);
@@ -28,14 +69,11 @@ export default function QuizEngine({ userData, onComplete }: Props) {
     setCurrentIdx(firstIdxOfCat);
   };
 
-  // Simplified handleSubmit to ensure it's always functional
   const handleFinalSubmit = async () => {
     if (isSubmitting) return;
     
-    const confirmSubmit = window.confirm("Are you sure you want to finalize and submit the test?");
-    if (!confirmSubmit) return;
-    
     setIsSubmitting(true);
+    setShowConfirmSubmit(false);
     console.log("Submitting test...");
 
     const categoryScores: Record<Category, number> = {
@@ -59,14 +97,43 @@ export default function QuizEngine({ userData, onComplete }: Props) {
       onComplete(finalResult);
     } catch (err) {
       console.error("Submission failed:", err);
-      // Still show results even if saving fails
       onComplete(finalResult);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Auto-submit on time up
+  const handleExit = async () => {
+    if (isExiting) return;
+    setIsExiting(true);
+
+    const categoryScores: Record<Category, number> = {
+      'CS': 0, 'Maths': 0, 'Aptitude': 0, 'English': 0, 'GK': 0
+    };
+
+    let totalScore = 0;
+    questions.forEach(q => {
+      if (answers[q.id] === q.correctAnswer) {
+        categoryScores[q.category] += 1;
+        totalScore += 1;
+      }
+    });
+
+    const finalResult: TestResult = {
+      userData, totalScore, categoryScores, answers, markedForReview, createdAt: new Date()
+    };
+
+    try {
+      await saveResult(finalResult);
+      onExit();
+    } catch (err) {
+      console.error("Exit save failed:", err);
+      onExit();
+    } finally {
+      setIsExiting(false);
+    }
+  };
+
   useEffect(() => {
     if (timeLeft <= 0) {
       handleFinalSubmit();
@@ -92,139 +159,164 @@ export default function QuizEngine({ userData, onComplete }: Props) {
   const categoriesList: Category[] = ['CS', 'Maths', 'Aptitude', 'English', 'GK'];
 
   return (
-    <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', backgroundColor: '#f8fafc', overflow: 'hidden', fontFamily: "'Inter', sans-serif" }}>
-      {/* Header */}
-      <header style={{ height: '56px', backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', flexShrink: 0, zIndex: 100 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ backgroundColor: '#2563eb', padding: '5px', borderRadius: '6px' }}>
-              <CheckCircle2 style={{ color: '#ffffff', width: '18px', height: '18px' }} />
-            </div>
-            <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '16px' }}>CET MOCK</span>
+    <div className="h-screen w-screen flex flex-col bg-slate-50 overflow-hidden font-['Inter'] relative">
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {showConfirmSubmit && (
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowConfirmSubmit(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white rounded-[32px] p-8 md:p-10 max-w-sm w-full relative z-10 shadow-2xl border border-slate-100"
+            >
+              <div className="text-center">
+                <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <CheckCircle2 size={32} />
+                </div>
+                <h3 className="text-2xl font-black text-slate-900 mb-2">Finalize Test?</h3>
+                <p className="text-slate-500 font-medium mb-8">Are you sure you want to submit your answers? <span className="text-red-500 font-bold">make sure you have attempted all the categories that mentioned in upper section (CS, Maths, Aptitude, English, GK).</span></p>
+                
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={handleFinalSubmit}
+                    disabled={isSubmitting}
+                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-base shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-[0.98]"
+                  >
+                    {isSubmitting ? 'SUBMITTING...' : 'YES, PROCEED'}
+                  </button>
+                  <button
+                    onClick={() => setShowConfirmSubmit(false)}
+                    className="w-full py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-base hover:bg-slate-200 transition-all active:scale-[0.98]"
+                  >
+                    CANCEL
+                  </button>
+                </div>
+              </div>
+            </motion.div>
           </div>
-          
-          <nav style={{ display: 'flex', gap: '4px', backgroundColor: '#f1f5f9', padding: '2px', borderRadius: '8px' }}>
-            {categoriesList.map(cat => (
-              <button
-                key={cat}
-                onClick={() => handleCategoryChange(cat)}
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  border: 'none',
-                  cursor: 'pointer',
-                  backgroundColor: activeCategory === cat ? '#ffffff' : 'transparent',
-                  color: activeCategory === cat ? '#2563eb' : '#64748b'
-                }}
-              >
-                {cat}
-              </button>
-            ))}
-          </nav>
-        </div>
+        )}
+      </AnimatePresence>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#fef2f2', padding: '5px 12px', borderRadius: '8px', border: '1px solid #fee2e2' }}>
-            <Clock style={{ width: '14px', height: '14px', color: '#ef4444' }} />
-            <span style={{ fontFamily: 'monospace', color: '#b91c1c', fontWeight: 700, fontSize: '16px' }}>{formatTime(timeLeft)}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ margin: 0, fontSize: '10px', fontWeight: 800, color: '#64748b' }}>{userData.name}</p>
+      {/* Header */}
+      <header className="h-16 md:h-20 bg-white border-b border-slate-200 flex items-center justify-center px-4 md:px-8 shrink-0 z-[100] shadow-sm">
+        <div className="max-w-7xl w-full flex items-center justify-between">
+          <div className="flex items-center gap-4 md:gap-8 overflow-hidden">
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="bg-blue-600 p-1.5 md:p-2.5 rounded-xl shadow-lg shadow-blue-600/20">
+                <CheckCircle2 className="text-white w-4 h-4 md:w-5 md:h-5" />
+              </div>
+              <span className="font-black text-slate-800 text-sm md:text-xl hidden sm:inline tracking-tight">CET MOCK</span>
             </div>
-            <div style={{ width: '32px', height: '32px', backgroundColor: '#f1f5f9', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <User style={{ width: '18px', height: '18px', color: '#94a3b8' }} />
+            
+            <nav className="flex gap-1 bg-slate-100 p-1 rounded-xl overflow-x-auto no-scrollbar border border-slate-200/50">
+              {categoriesList.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => handleCategoryChange(cat)}
+                  className={`px-3 md:px-5 py-1.5 md:py-2.5 rounded-lg text-[10px] md:text-sm font-black shrink-0 transition-all uppercase tracking-wider ${
+                    activeCategory === cat ? 'bg-white text-blue-600 shadow-md ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-4 md:gap-6 ml-4">
+            <button
+              onClick={handleExit}
+              disabled={isExiting}
+              className="text-[10px] md:text-xs font-black text-red-500 hover:text-white hover:bg-red-500 transition-all uppercase tracking-widest px-4 py-2 md:py-2.5 rounded-xl border-2 border-red-100 hover:border-red-500 bg-red-50/50 flex items-center gap-2"
+            >
+              {isExiting ? 'Exiting...' : 'Exit Test'}
+            </button>
+            <div className="flex items-center gap-2 bg-slate-900 px-3 md:px-4 py-2 md:py-2.5 rounded-xl shadow-lg shadow-slate-900/10 shrink-0 border border-slate-800">
+              <Clock className="w-4 h-4 md:w-5 md:h-5 text-blue-400" />
+              <span className="font-mono text-white font-bold text-sm md:text-xl leading-none">{formatTime(timeLeft)}</span>
+            </div>
+            <div className="hidden lg:flex items-center gap-3 pl-4 border-l border-slate-200">
+              <div className="text-right">
+                <p className="m-0 text-[10px] font-black text-slate-400 uppercase tracking-widest">{userData.name}</p>
+              </div>
+              <div className="w-10 h-10 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center border border-slate-200 shadow-sm">
+                <User className="w-6 h-6 text-slate-500" />
+              </div>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content Body */}
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 300px', overflow: 'hidden' }}>
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_350px] overflow-hidden">
         {/* Left: Question Card Area */}
-        <main style={{ overflowY: 'auto', padding: '20px', display: 'flex', justifyContent: 'center', backgroundColor: '#f8fafc' }}>
-          <div style={{ width: '100%', maxWidth: '800px' }}>
+        <main className="overflow-y-auto px-4 md:px-8 py-6 flex flex-col items-center bg-slate-50">
+          <div className="w-full max-w-3xl flex-1 flex flex-col">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentQuestion.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
-                style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '20px' }}
+                className="bg-white rounded-xl md:rounded-3xl border border-slate-200 p-4 md:p-8 shadow-sm lg:flex-initial min-h-0 pb-32 sm:pb-8"
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ backgroundColor: '#2563eb', color: '#ffffff', padding: '3px 10px', borderRadius: '5px', fontSize: '10px', fontWeight: 900 }}>
+                <div className="flex justify-between items-center mb-4 md:mb-8 border-b border-slate-100 pb-3 md:pb-6">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-blue-600 text-white px-2 py-0.5 rounded-md text-[10px] md:text-sm font-black">
                       Q {currentIdx + 1}
                     </span>
-                    <span style={{ color: '#94a3b8', fontSize: '10px', fontWeight: 600 }}>{currentQuestion.category}</span>
+                    <span className="text-slate-400 text-[10px] md:text-sm font-bold uppercase tracking-widest">{currentQuestion.category}</span>
                   </div>
                   <button 
                     onClick={() => setMarkedForReview(prev => 
                       prev.includes(currentQuestion.id) ? prev.filter(id => id !== currentQuestion.id) : [...prev, currentQuestion.id]
                     )}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      border: 'none',
-                      backgroundColor: markedForReview.includes(currentQuestion.id) ? '#fffbeb' : 'transparent',
-                      color: markedForReview.includes(currentQuestion.id) ? '#d97706' : '#94a3b8'
-                    }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] md:text-sm font-bold transition-all border ${
+                      markedForReview.includes(currentQuestion.id) 
+                      ? 'bg-amber-50 text-amber-600 border-amber-100' 
+                      : 'text-slate-400 border-transparent hover:bg-slate-50'
+                    }`}
                   >
-                    <Bookmark style={{ width: '14px', height: '14px', fill: markedForReview.includes(currentQuestion.id) ? 'currentColor' : 'none' }} />
-                    {markedForReview.includes(currentQuestion.id) ? 'Review' : 'Mark'}
+                    <Bookmark className={`w-3.5 h-3.5 md:w-5 md:h-5 ${markedForReview.includes(currentQuestion.id) ? 'fill-current' : ''}`} />
+                    {markedForReview.includes(currentQuestion.id) ? 'Reviewing' : 'Mark Review'}
                   </button>
                 </div>
 
-                <div style={{ marginBottom: '20px' }}>
-                  <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', lineHeight: 1.4, margin: '0 0 16px 0' }}>
+                <div className="mb-6 md:mb-10">
+                  <h2 className="text-base md:text-2xl font-bold text-slate-800 leading-snug mb-6">
                     {currentQuestion.question}
                   </h2>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div className="flex flex-col gap-2 md:gap-4">
                     {currentQuestion.options.map((option, idx) => {
                       const isSelected = answers[currentQuestion.id] === idx;
                       return (
                         <button
                           key={idx}
                           onClick={() => setAnswers(prev => ({ ...prev, [currentQuestion.id]: idx }))}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px',
-                            width: '100%',
-                            padding: '12px 16px',
-                            borderRadius: '10px',
-                            border: '1.5px solid',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            borderColor: isSelected ? '#2563eb' : '#f1f5f9',
-                            backgroundColor: isSelected ? '#eff6ff' : '#ffffff'
-                          }}
+                          className={`flex items-center gap-3 w-full p-3 md:p-5 rounded-xl border-2 text-left transition-all group ${
+                            isSelected 
+                            ? 'border-blue-600 bg-blue-50/50 shadow-md shadow-blue-600/5' 
+                            : 'border-slate-100 bg-white hover:border-slate-200'
+                          }`}
                         >
-                          <div style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '50%',
-                            border: '1.5px solid',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderColor: isSelected ? '#2563eb' : '#e2e8f0',
-                            backgroundColor: isSelected ? '#2563eb' : 'transparent'
-                          }}>
-                            <span style={{ fontSize: '11px', fontWeight: 800, color: isSelected ? '#ffffff' : '#94a3b8' }}>{String.fromCharCode(65 + idx)}</span>
+                          <div className={`w-7 h-7 md:w-10 md:h-10 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all ${
+                            isSelected 
+                            ? 'border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-600/20' 
+                            : 'border-slate-200 bg-white group-hover:border-slate-300 text-slate-400'
+                          }`}>
+                            <span className="text-[10px] md:text-sm font-black">{String.fromCharCode(65 + idx)}</span>
                           </div>
-                          <span style={{ fontSize: '14px', fontWeight: 600, color: isSelected ? '#1e3a8a' : '#475569' }}>{option}</span>
+                          <span className={`text-xs md:text-base font-semibold ${isSelected ? 'text-blue-900' : 'text-slate-600'}`}>{option}</span>
                         </button>
                       );
                     })}
@@ -233,120 +325,80 @@ export default function QuizEngine({ userData, onComplete }: Props) {
               </motion.div>
             </AnimatePresence>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
-              <button
-                disabled={currentIdx === 0}
-                onClick={() => setCurrentIdx(prev => prev - 1)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '10px 20px',
-                  borderRadius: '10px',
-                  fontWeight: 700,
-                  fontSize: '13px',
-                  backgroundColor: '#ffffff',
-                  color: '#475569',
-                  border: '1px solid #e2e8f0',
-                  cursor: 'pointer',
-                  opacity: currentIdx === 0 ? 0.5 : 1
-                }}
-              >
-                <ArrowLeft style={{ width: '16px', height: '16px' }} />
-                Previous
-              </button>
-
-              <div style={{ display: 'flex', gap: '10px' }}>
+            <div className="sticky bottom-0 bg-slate-50/90 backdrop-blur-md pt-2 pb-6 mt-auto z-10 sm:border-none">
+              <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2 sm:gap-4 px-1 sm:px-0">
                 <button
-                  onClick={() => setAnswers(prev => {
-                    const newAnswers = { ...prev };
-                    delete newAnswers[currentQuestion.id];
-                    return newAnswers;
-                  })}
-                  style={{ padding: '0 12px', border: 'none', backgroundColor: 'transparent', color: '#94a3b8', fontWeight: 700, cursor: 'pointer', fontSize: '12px' }}
+                  disabled={currentIdx === 0}
+                  onClick={() => setCurrentIdx(prev => prev - 1)}
+                  className="flex items-center justify-center gap-2 py-3 sm:py-4 px-6 rounded-xl sm:rounded-2xl font-bold text-xs sm:text-sm bg-white text-slate-600 border border-slate-200 shadow-sm hover:bg-slate-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  CLEAR
+                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+                  Previous
                 </button>
-                
-                {currentIdx < questions.length - 1 ? (
+
+                <div className="flex gap-2 sm:gap-3 flex-1 sm:flex-initial">
                   <button
-                    onClick={() => setCurrentIdx(prev => prev + 1)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '10px 32px',
-                      borderRadius: '10px',
-                      fontWeight: 700,
-                      fontSize: '13px',
-                      backgroundColor: '#2563eb',
-                      color: '#ffffff',
-                      border: 'none',
-                      cursor: 'pointer'
-                    }}
+                    onClick={() => setAnswers(prev => {
+                      const newAnswers = { ...prev };
+                      delete newAnswers[currentQuestion.id];
+                      return newAnswers;
+                    })}
+                    className="flex-1 sm:flex-initial py-3 sm:py-4 px-4 sm:px-6 bg-slate-100 text-slate-500 rounded-xl sm:rounded-2xl font-bold text-[10px] sm:text-sm hover:bg-slate-200 transition-all uppercase tracking-widest"
                   >
-                    Next
-                    <ArrowRight style={{ width: '16px', height: '16px' }} />
+                    Clear
                   </button>
-                ) : (
-                  <button
-                    onClick={handleFinalSubmit}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '10px 32px',
-                      borderRadius: '10px',
-                      fontWeight: 700,
-                      fontSize: '13px',
-                      backgroundColor: '#10b981',
-                      color: '#ffffff',
-                      border: 'none',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Submit
-                    <Send style={{ width: '16px', height: '16px' }} />
-                  </button>
-                )}
+                  
+                  {currentIdx < questions.length - 1 ? (
+                    <button
+                      onClick={() => setCurrentIdx(prev => prev + 1)}
+                      className="flex-[2] sm:flex-initial flex items-center justify-center gap-2 py-3 sm:py-4 px-6 sm:px-12 rounded-xl sm:rounded-2xl font-black text-sm sm:text-base bg-blue-600 text-white shadow-lg shadow-blue-600/30 hover:bg-blue-700 active:scale-[0.98] transition-all"
+                    >
+                      Next
+                      <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleFinalSubmit}
+                      className="flex-[2] sm:flex-initial flex items-center justify-center gap-2 py-3 sm:py-4 px-6 sm:px-12 rounded-xl sm:rounded-2xl font-black text-sm sm:text-base bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 hover:bg-emerald-600 active:scale-[0.98] transition-all"
+                    >
+                      Finish Test
+                      <Send className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </main>
 
-        {/* Right Sidebar */}
-        <aside style={{ backgroundColor: '#ffffff', borderLeft: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', padding: '20px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '11px', fontWeight: 900, color: '#1e293b' }}>NAVIGATOR</h3>
-              <div style={{ backgroundColor: '#f1f5f9', padding: '3px 8px', borderRadius: '5px', fontSize: '9px', fontWeight: 800, color: '#64748b' }}>
-                {Object.keys(answers).length}/{questions.length}
+        {/* Right Sidebar - Becomes bottom section on mobile */}
+        <aside className="bg-white border-l lg:border-slate-200 flex flex-col px-4 md:px-8 py-6 lg:h-full overflow-y-auto">
+          <div className="flex flex-col h-full">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Question Navigator</h3>
+              <div className="bg-blue-50 px-3 py-1 rounded-lg text-[10px] font-black text-blue-600 border border-blue-100">
+                {Object.keys(answers).length}/{questions.length} Attempted
               </div>
             </div>
 
-            {/* Legend */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px', borderRadius: '8px', border: '1px solid #f1f5f9', backgroundColor: '#f8fafc' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }} />
-                <span style={{ fontSize: '9px', fontWeight: 700, color: '#64728b' }}>Ans</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px', borderRadius: '8px', border: '1px solid #f1f5f9', backgroundColor: '#f8fafc' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
-                <span style={{ fontSize: '9px', fontWeight: 700, color: '#64728b' }}>Skip</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px', borderRadius: '8px', border: '1px solid #f1f5f9', backgroundColor: '#f8fafc' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#f59e0b' }} />
-                <span style={{ fontSize: '9px', fontWeight: 700, color: '#64728b' }}>Rev</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px', borderRadius: '8px', border: '1px solid #f1f5f9', backgroundColor: '#f8fafc' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#cbd5e1' }} />
-                <span style={{ fontSize: '9px', fontWeight: 700, color: '#64728b' }}>Empty</span>
-              </div>
+            {/* Legend - Even more compact */}
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {[
+                { label: 'Ans', color: 'bg-emerald-500' },
+                { label: 'Skip', color: 'bg-red-500' },
+                { label: 'Rev', color: 'bg-amber-500' },
+                { label: 'Unv', color: 'bg-slate-200' }
+              ].map((item) => (
+                <div key={item.label} className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-50 rounded-md border border-slate-100">
+                  <div className={`w-1.5 h-1.5 rounded-full ${item.color}`} />
+                  <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter">{item.label}</span>
+                </div>
+              ))}
             </div>
 
-            {/* Questions Grid */}
-            <div style={{ flex: 1, overflowY: 'auto', marginBottom: '16px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+            {/* Questions Grid - Scrollable and even more compact */}
+            <div className="max-h-[160px] lg:max-h-none overflow-y-auto mb-4 pr-1 scrollbar-thin">
+              <div className="grid grid-cols-8 sm:grid-cols-10 lg:grid-cols-5 gap-1 md:gap-2">
                 {questions.map((q, i) => {
                   if (q.category !== activeCategory) return null;
                   const status = getQuestionStatus(q.id);
@@ -356,20 +408,12 @@ export default function QuizEngine({ userData, onComplete }: Props) {
                     <button
                       key={q.id}
                       onClick={() => setCurrentIdx(i)}
-                      style={{
-                        height: '32px',
-                        borderRadius: '8px',
-                        fontSize: '11px',
-                        fontWeight: 800,
-                        border: '1.5px solid',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: status === 'answered' ? '#10b981' : status === 'skipped' ? '#ef4444' : status === 'review' ? '#f59e0b' : '#f8fafc',
-                        color: (status === 'answered' || status === 'skipped' || status === 'review') ? '#ffffff' : '#94a3b8',
-                        borderColor: isCurrent ? '#2563eb' : 'transparent',
-                      }}
+                      className={`h-7 md:h-10 rounded-lg text-[9px] md:text-sm font-black border transition-all active:scale-[0.9] flex items-center justify-center ${
+                        status === 'answered' ? 'bg-emerald-500 border-emerald-500 text-white' : 
+                        status === 'skipped' ? 'bg-red-500 border-red-500 text-white' : 
+                        status === 'review' ? 'bg-amber-500 border-amber-500 text-white' : 
+                        'bg-slate-50 border-slate-100 text-slate-400'
+                      } ${isCurrent ? 'ring-2 ring-blue-600/20 !border-blue-600 !text-blue-600 !bg-white' : ''}`}
                     >
                       {i + 1}
                     </button>
@@ -378,31 +422,14 @@ export default function QuizEngine({ userData, onComplete }: Props) {
               </div>
             </div>
 
-            <div style={{ marginTop: 'auto' }}>
+            <div className="mt-4 pt-4 border-t border-slate-100">
               <button
-                onClick={() => {
-                  console.log("Finalize clicked");
-                  handleFinalSubmit();
-                }}
+                onClick={() => setShowConfirmSubmit(true)}
                 id="finalize-test-btn"
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  backgroundColor: '#1e293b',
-                  color: '#ffffff',
-                  borderRadius: '12px',
-                  fontWeight: 800,
-                  fontSize: '13px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
-                }}
+                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-sm border-none hover:bg-black transition-all shadow-xl shadow-slate-900/20 flex items-center justify-center gap-3 group"
               >
                 FINALIZE TEST
-                <ArrowRight style={{ width: '16px', height: '16px' }} />
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
           </div>
