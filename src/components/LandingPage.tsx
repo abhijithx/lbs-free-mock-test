@@ -1,120 +1,201 @@
 import React, { useState } from 'react';
 import type { UserData } from '../types';
-import { GraduationCap, ArrowRight } from 'lucide-react';
+import { GraduationCap, ArrowRight, Clock, BookOpen, BarChart2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface Props {
   onStart: (data: UserData) => void;
+  totalQuestions: number;
 }
 
-export default function LandingPage({ onStart }: Props) {
+export default function LandingPage({ onStart, totalQuestions }: Props) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+
+  const validatePhone = (val: string) => {
+    setPhone(val);
+    if (val.length > 0 && !/^\d+$/.test(val)) {
+      setPhoneError('Only digits allowed');
+    } else if (val.length > 0 && val.length < 10) {
+      setPhoneError('Must be at least 10 digits');
+    } else {
+      setPhoneError('');
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name && phone.length >= 10) {
-      onStart({ name, phone });
+    if (name.trim() && phone.length >= 10 && /^\d+$/.test(phone)) {
+      onStart({ name: name.trim(), phone });
     }
   };
+
+  const isValid = name.trim().length > 0 && phone.length >= 10 && /^\d+$/.test(phone);
+
+  const stats = [
+    { icon: BookOpen, label: 'Questions', value: `${totalQuestions}` },
+    { icon: Clock, label: 'Duration', value: '120 Min' },
+    { icon: BarChart2, label: 'Categories', value: '5 Topics' },
+  ];
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-['Inter']">
       {/* Navbar */}
-      <nav className="bg-white border-b border-slate-200 py-4 fixed w-full z-[100] flex justify-center shadow-sm px-6">
-        <div className="max-w-7xl w-full flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <div className="bg-blue-600 p-2.5 rounded-xl shadow-lg shadow-blue-600/20">
-              <GraduationCap className="text-white w-6 h-6" />
+      <nav className="bg-white border-b border-slate-200 py-3.5 fixed w-full z-[100] shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-600 p-2 rounded-xl shadow-lg shadow-blue-600/20">
+              <GraduationCap className="text-white w-5 h-5" />
             </div>
-            <span className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">LBS MCA MOCK TEST</span>
+            <span className="text-lg sm:text-xl font-black text-slate-800 tracking-tight">LBS MCA MOCK TEST</span>
           </div>
-          <div className="hidden md:flex gap-10 text-sm font-bold text-slate-500 items-center">
-            
-            <button className="bg-blue-50 text-blue-600 px-5 py-2.5 rounded-xl border border-blue-100 hover:bg-blue-100 transition-all font-black text-xs uppercase tracking-widest" onClick={()=> window.location.href = "https://lbscourse.cetmca.in/"}>
-              Join LBS MCA Prep
-            </button>
-          </div>
+          <a
+            href="https://lbscourse.cetmca.in/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-blue-50 text-blue-600 px-4 py-2 rounded-xl border border-blue-100 hover:bg-blue-100 transition-all font-black text-xs uppercase tracking-widest"
+          >
+            Join LBS Prep
+          </a>
         </div>
       </nav>
 
-      {/* Hero Content */}
-      <main className="flex-1 flex items-center justify-center pt-28 pb-16 px-6 md:px-10 lg:pt-32">
-        <div className="max-w-7xl w-full grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-12 lg:gap-20 items-center">
-          
-          {/* Left Side: Brand Text */}
-          <div className="text-center lg:text-left">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 leading-[1.1] tracking-tighter mb-8">
-                Test your knowledge with<br />
-                <span className="text-blue-600">FREE MOCK TEST</span>
-              </h1>
-              <p className="text-lg md:text-xl text-slate-500 leading-relaxed max-w-2xl lg:max-w-[540px] mb-12 font-medium mx-auto lg:mx-0">
-                mock test crafted by <span className="text-red-600 font-bold">students of Computer Applications</span> at the<span className="text-red-600 font-bold"> College of Engineering Trivandrum(CET)</span>. This test is built to reflect real exam patterns, helping you evaluate your performance with precision. Get instant results, detailed analytics, and category-wise scoring across CS, Maths, Aptitude, English, and GK.
-              </p>
-            </motion.div>
-          </div>  
+      {/* Hero */}
+      <main className="flex-1 flex items-center justify-center pt-24 pb-16 px-4 sm:px-6 lg:pt-28">
+        <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
 
-          {/* Right Side: Professional Form */}
+          {/* Left: Brand Text */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="bg-white p-8 md:p-10 lg:p-12 rounded-3xl md:rounded-[40px] border border-slate-200 shadow-2xl shadow-slate-200/40 relative overflow-hidden"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55 }}
+            className="text-center lg:text-left"
           >
-            <div className="text-center mb-8">
-              <h3 className="text-2xl md:text-3xl font-black text-slate-900 mb-2">Register Now</h3>
-              <p className="text-slate-500 font-medium text-sm">Enter your details to start the exam</p>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100 mb-5">
+              <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+              <span className="text-xs font-black text-blue-600 uppercase tracking-widest">Free Mock Test 2026</span>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-              <div className="flex flex-col gap-2.5">
-                <label className="text-[13px] font-black text-slate-500 uppercase tracking-wider">Student Name</label>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 leading-[1.1] tracking-tighter mb-5">
+              Test your knowledge with{' '}
+              <span className="text-blue-600">LBS MCA</span>{' '}
+              Mock Test
+            </h1>
+
+            <p className="text-base sm:text-lg text-slate-500 leading-relaxed max-w-xl mx-auto lg:mx-0 mb-7 font-medium">
+              Crafted by{' '}
+              <span className="text-red-600 font-bold">students of Computer Applications</span>{' '}
+              at{' '}
+              <span className="text-red-600 font-bold">College of Engineering Trivandrum (CET)</span>.
+              Evaluate your performance with instant results, detailed analytics, and category-wise scoring.
+            </p>
+
+            {/* Stats Row */}
+            <div className="flex flex-wrap justify-center lg:justify-start gap-3">
+              {stats.map(({ icon: Icon, label, value }) => (
+                <div key={label} className="flex items-center gap-2.5 bg-white px-4 py-2.5 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center">
+                    <Icon className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest leading-none">{label}</p>
+                    <p className="text-sm font-black text-slate-800">{value}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Categories */}
+            <div className="mt-6 flex flex-wrap justify-center lg:justify-start gap-2">
+              {[
+                { cat: 'CS', n: 50 }, { cat: 'Maths', n: 25 }, { cat: 'Aptitude', n: 25 },
+                { cat: 'English', n: 15 }, { cat: 'GK', n: 5 }
+              ].map(({ cat, n }) => (
+                <span key={cat} className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 shadow-sm">
+                  {cat} <span className="text-blue-600">·{n}Q</span>
+                </span>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Right: Registration Form */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.15 }}
+            className="bg-white p-7 sm:p-9 rounded-3xl border border-slate-200 shadow-2xl shadow-slate-200/50 w-full"
+          >
+            <div className="text-center mb-7">
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-1.5">Register to Start</h2>
+              <p className="text-slate-500 font-medium text-sm">Enter your details to begin the exam</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
+              {/* Name */}
+              <div className="flex flex-col gap-2">
+                <label htmlFor="student-name" className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                  Full Name
+                </label>
                 <input
+                  id="student-name"
                   type="text"
                   required
                   placeholder="Enter your full name"
-                  className="px-5 py-4 rounded-2xl border-2 border-slate-100 text-base outline-none focus:border-blue-600 transition-all bg-slate-50 text-slate-900 font-semibold"
+                  className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-100 text-sm outline-none focus:border-blue-500 transition-all bg-slate-50 text-slate-900 font-semibold placeholder:font-normal"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={e => setName(e.target.value)}
                 />
               </div>
 
-              <div className="flex flex-col gap-2.5">
-                <label className="text-[13px] font-black text-slate-500 uppercase tracking-wider">Phone Number</label>
+              {/* Phone */}
+              <div className="flex flex-col gap-2">
+                <label htmlFor="student-phone" className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                  Phone Number
+                </label>
                 <input
+                  id="student-phone"
                   type="tel"
                   required
                   placeholder="10-digit mobile number"
-                  className="px-5 py-4 rounded-2xl border-2 border-slate-100 text-base outline-none focus:border-blue-600 transition-all bg-slate-50 text-slate-900 font-semibold"
+                  maxLength={13}
+                  className={`w-full px-4 py-3.5 rounded-2xl border-2 text-sm outline-none transition-all bg-slate-50 text-slate-900 font-semibold placeholder:font-normal ${
+                    phoneError ? 'border-red-300 focus:border-red-400' : 'border-slate-100 focus:border-blue-500'
+                  }`}
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={e => validatePhone(e.target.value)}
                 />
+                {phoneError && (
+                  <p className="text-xs text-red-500 font-semibold mt-0.5">{phoneError}</p>
+                )}
               </div>
 
+              {/* Note */}
+              <div className="bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 text-xs text-amber-700 font-semibold leading-relaxed">
+                ⚠️ Once you start, the 120-minute timer begins immediately. Ensure a stable internet connection.
+              </div>
+
+              {/* Submit */}
               <button
                 type="submit"
-                disabled={!name || phone.length < 10}
-                className={`mt-3 py-5 px-8 bg-blue-600 text-white rounded-2xl text-base md:text-lg font-black border-none cursor-pointer flex items-center justify-center gap-3 transition-all shadow-lg shadow-blue-600/30 hover:bg-blue-700 active:scale-[0.98] ${
-                  (!name || phone.length < 10) ? 'opacity-60 cursor-not-allowed' : 'opacity-100'
+                disabled={!isValid}
+                className={`mt-1 py-4 px-6 bg-blue-600 text-white rounded-2xl text-sm font-black border-none flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-blue-600/30 hover:bg-blue-700 active:scale-[0.98] ${
+                  !isValid ? 'opacity-50 cursor-not-allowed' : 'opacity-100 hover:-translate-y-0.5'
                 }`}
               >
                 START MOCK TEST
-                <ArrowRight className="w-5 h-5 md:w-6 md:h-6" />
+                <ArrowRight className="w-4 h-4" />
               </button>
             </form>
           </motion.div>
         </div>
       </main>
 
-      <footer className="px-6 py-10 md:px-10 border-t border-slate-200 bg-white flex justify-center mt-auto">
-        <div className="max-w-7xl w-full flex flex-col md:flex-row justify-between items-center gap-6">
-          <p className="text-sm text-slate-400 font-bold text-center md:text-left">© 2026 CET Computer Application Department</p>
-          <div className="flex gap-8 text-sm text-slate-300 font-bold">
+      {/* Footer */}
+      <footer className="border-t border-slate-200 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row justify-between items-center gap-3">
+          <p className="text-sm text-slate-400 font-semibold text-center">© 2026 CET Computer Applications Department</p>
+          <div className="flex gap-6 text-sm font-semibold text-slate-300">
             <span className="hover:text-slate-500 cursor-pointer transition-colors">Privacy Policy</span>
             <span className="hover:text-slate-500 cursor-pointer transition-colors">Support</span>
           </div>
