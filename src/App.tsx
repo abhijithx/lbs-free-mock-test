@@ -8,6 +8,35 @@ import { GraduationCap, AlertCircle, RefreshCw } from 'lucide-react';
 
 type AppState = 'landing' | 'quiz' | 'result';
 
+const SITE_URL = 'https://lbsmcafreemock.cetmca.in/';
+
+const META_BY_STATE: Record<AppState, { title: string; description: string }> = {
+  landing: {
+    title: 'Free LBS MCA Mock Test 2026 | CET Trivandrum',
+    description: 'Practice the free LBS MCA Mock Test 2026 by CET Trivandrum with 120 questions, a 120-minute timer, instant scoring, and category-wise analytics.',
+  },
+  quiz: {
+    title: 'LBS MCA Mock Test In Progress | CET Trivandrum',
+    description: 'Continue the free LBS MCA mock test and complete 120 questions across CS, Maths, Aptitude, English, and GK.',
+  },
+  result: {
+    title: 'LBS MCA Mock Test Result | CET Trivandrum',
+    description: 'Review your LBS MCA mock test score, subject-wise analytics, accuracy, and performance insights.',
+  },
+};
+
+function upsertMeta(selector: string, attributes: Record<string, string>) {
+  let element = document.head.querySelector(selector);
+  if (!element) {
+    element = document.createElement(attributes.href ? 'link' : 'meta');
+    document.head.appendChild(element);
+  }
+
+  Object.entries(attributes).forEach(([key, value]) => {
+    element.setAttribute(key, value);
+  });
+}
+
 function App() {
   // --- Question Data ---
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -38,6 +67,20 @@ function App() {
   useEffect(() => { localStorage.setItem('lbs_mock_state', appState); }, [appState]);
   useEffect(() => { if (userData) localStorage.setItem('lbs_mock_user', JSON.stringify(userData)); }, [userData]);
   useEffect(() => { if (result) localStorage.setItem('lbs_mock_result', JSON.stringify(result)); }, [result]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const meta = META_BY_STATE[appState];
+    document.title = meta.title;
+    upsertMeta('meta[name="description"]', { name: 'description', content: meta.description });
+    upsertMeta('meta[property="og:title"]', { property: 'og:title', content: meta.title });
+    upsertMeta('meta[property="og:description"]', { property: 'og:description', content: meta.description });
+    upsertMeta('meta[property="og:url"]', { property: 'og:url', content: SITE_URL });
+    upsertMeta('meta[name="twitter:title"]', { name: 'twitter:title', content: meta.title });
+    upsertMeta('meta[name="twitter:description"]', { name: 'twitter:description', content: meta.description });
+    upsertMeta('link[rel="canonical"]', { rel: 'canonical', href: SITE_URL });
+  }, [appState]);
 
   const handleStart = (data: UserData) => { setUserData(data); setAppState('quiz'); };
   const handleComplete = (res: TestResult) => {
